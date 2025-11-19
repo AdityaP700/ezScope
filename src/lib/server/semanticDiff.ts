@@ -79,6 +79,6 @@ function calculateSimilarity(a: Claim, b: Claim): number {
     // Mock similarity: check word overlap
     const wordsA = new Set(a.rawText.toLowerCase().split(/\W+/));
     const wordsB = new Set(b.rawText.toLowerCase().split(/\W+/));
-    const intersection = new Set([...wordsA].filter(x => wordsB.has(x)));
+    const intersection = new Set(Array.from(wordsA).filter(x => wordsB.has(x)));
     return (2 * intersection.size) / (wordsA.size + wordsB.size);
 }
