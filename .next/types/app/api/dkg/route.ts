@@ -1,4 +1,4 @@
-// File: D:\Development\Projects\core\ezSocial\src\app\api\dkg\route.ts
+// File: /Users/ayush/Documents/hackathons/graph-hack/ezScope/src/app/api/dkg/route.ts
 import * as entry from '../../../../../src/app/api/dkg/route.js'
 import type { NextRequest } from 'next/server.js'
 

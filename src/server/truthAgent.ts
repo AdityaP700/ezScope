@@ -1,11 +1,12 @@
 import { extractClaimsFromText } from '../lib/server/claimExtractor';
-import { convertToRdf } from '../lib/server/rdfConverter';
 import { compareClaims } from '../lib/server/semanticDiff';
 import { dkgClient } from '../lib/server/dkgClient';
 import { createJob, updateJob } from '../lib/server/jobQueue';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import {
+    createWikipediaAssetJsonLd,
+    createGrokipediaAssetJsonLd,
+    createCommunityNoteAssetJsonLd
+} from '../lib/server/knowledgeAssets';
 
 export async function runComparisonJob(topic: string, sourceA: string, sourceB: string, textA: string, textB: string) {
     const jobId = createJob();
@@ -19,30 +20,42 @@ export async function runComparisonJob(topic: string, sourceA: string, sourceB: 
             const claimsA = await extractClaimsFromText(textA);
             const claimsB = await extractClaimsFromText(textB);
 
-            // 2. Convert to RDF & Publish to DKG (Mock)
-            const rdfA = await convertToRdf(topic, claimsA, sourceA);
-            const rdfB = await convertToRdf(topic, claimsB, sourceB);
+            // 2. Convert to JSON-LD & Publish to DKG (KA1 & KA2)
+            // KA1: Wikipedia
+            const jsonLdA = createWikipediaAssetJsonLd(topic, claimsA, sourceA);
+            const kaA = await dkgClient.publishKnowledgeAsset(jsonLdA);
+            console.log(`Published KA1 (Wikipedia): ${kaA.ual}`);
 
-            const kaA = await dkgClient.publishKnowledgeAsset(rdfA.jsonld);
-            const kaB = await dkgClient.publishKnowledgeAsset(rdfB.jsonld);
+            // KA2: Grokipedia
+            const jsonLdB = createGrokipediaAssetJsonLd(topic, claimsB, sourceB);
+            const kaB = await dkgClient.publishKnowledgeAsset(jsonLdB);
+            console.log(`Published KA2 (Grokipedia): ${kaB.ual}`);
 
             // 3. Semantic Diff
             const comparison = await compareClaims(topic, claimsA, claimsB);
 
-            // 4. Generate Community Notes
+            // 4. Generate Community Notes (KA3) & Publish to DKG
             const notes = [];
             for (const diff of comparison.discrepancies) {
-                const note = await prisma.communityNote.create({
-                    data: {
-                        topic,
-                        finding: diff.type,
-                        evidence: JSON.stringify([kaA.kaId, kaB.kaId]),
-                        confidence: diff.confidence,
-                        stakedValue: '0',
-                        reputationScore: 0
-                    }
+                const noteJsonLd = createCommunityNoteAssetJsonLd(
+                    topic,
+                    diff.type,
+                    diff.summary,
+                    [kaA.ual, kaB.ual],
+                    diff.confidence,
+                    '0' // Initial staked value
+                );
+
+                const kaNote = await dkgClient.publishKnowledgeAsset(noteJsonLd);
+                console.log(`Published KA3 (Community Note): ${kaNote.ual}`);
+
+                notes.push({
+                    ...diff,
+                    ual: kaNote.ual,
+                    kaId: kaNote.kaId,
+                    evidence: [kaA.ual, kaB.ual],
+                    stakedValue: '0'
                 });
-                notes.push(note);
             }
 
             updateJob(jobId, 'completed', { comparison, notes, kaA, kaB });
@@ -55,3 +68,4 @@ export async function runComparisonJob(topic: string, sourceA: string, sourceB: 
 
     return jobId;
 }
+

@@ -1,4 +1,4 @@
-// File: D:\Development\Projects\core\ezSocial\src\app\api\payment\route.ts
+// File: /Users/ayush/Documents/hackathons/graph-hack/ezScope/src/app/api/payment/route.ts
 import * as entry from '../../../../../src/app/api/payment/route.js'
 import type { NextRequest } from 'next/server.js'
 

@@ -1,4 +1,4 @@
-// File: D:\Development\Projects\core\ezSocial\src\app\topic\[topic]\page.tsx
+// File: /Users/ayush/Documents/hackathons/graph-hack/ezScope/src/app/topic/[topic]/page.tsx
 import * as entry from '../../../../../src/app/topic/[topic]/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

@@ -21,17 +21,10 @@ export default function TopicPage() {
     const startComparison = async () => {
       setStatus('loading');
       try {
-        // Mock fetching text for the topic
-        // In a real app, this would be done by a scraper service
-        const textA = getMockText(topic, 'wikipedia');
-        const textB = getMockText(topic, 'grokipedia');
-
         const res = await axios.post('/api/compare', {
           topic,
           sourceA: 'Wikipedia',
-          sourceB: 'Grokipedia',
-          textA,
-          textB
+          sourceB: 'Grokipedia'
         });
 
         setJobId(res.data.jobId);
@@ -65,7 +58,7 @@ export default function TopicPage() {
               type: n.finding,
               summary: job.result.comparison.discrepancies[i]?.summary || 'Discrepancy found',
               confidence: n.confidence,
-              evidence: JSON.parse(n.evidence),
+              evidence: n.evidence,
               stakedValue: n.stakedValue
             }))
           };

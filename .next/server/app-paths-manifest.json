@@ -1,9 +1,9 @@
 {
   "/_not-found": "app/_not-found.js",
-  "/api/compare/route": "app/api/compare/route.js",
   "/api/dkg/route": "app/api/dkg/route.js",
   "/api/job/route": "app/api/job/route.js",
   "/api/payment/route": "app/api/payment/route.js",
-  "/page": "app/page.js",
-  "/topic/[topic]/page": "app/topic/[topic]/page.js"
+  "/api/compare/route": "app/api/compare/route.js",
+  "/topic/[topic]/page": "app/topic/[topic]/page.js",
+  "/page": "app/page.js"
 }

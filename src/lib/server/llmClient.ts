@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY || 'mock-key',
+    apiKey: process.env.OPENAI_API_KEY,
 });
 
 const CLAIM_EXTRACTION_PROMPT = `
@@ -18,8 +18,7 @@ Convert the following list of claims into JSON-LD compatible Knowledge Asset. Us
 
 export async function extractClaims(text: string): Promise<any[]> {
     if (!process.env.OPENAI_API_KEY) {
-        console.warn('OPENAI_API_KEY not found, using fallback heuristics');
-        return mockExtractClaims(text);
+        throw new Error('OPENAI_API_KEY is not set');
     }
 
     try {
@@ -37,13 +36,13 @@ export async function extractClaims(text: string): Promise<any[]> {
         return JSON.parse(content);
     } catch (error) {
         console.error('LLM extraction failed:', error);
-        return mockExtractClaims(text);
+        throw error;
     }
 }
 
 export async function generateRdfFromClaims(topic: string, claims: any[], source: string): Promise<{ jsonld: any; triples: Array<[string, string, string]> }> {
     if (!process.env.OPENAI_API_KEY) {
-        return mockGenerateRdf(topic, claims, source);
+        throw new Error('OPENAI_API_KEY is not set');
     }
 
     try {
@@ -59,57 +58,46 @@ export async function generateRdfFromClaims(topic: string, claims: any[], source
         const content = response.choices[0].message.content;
         if (!content) throw new Error('No content from LLM');
         const jsonld = JSON.parse(content);
-        // Extract triples from JSON-LD (mock implementation of extraction for now)
+        // Extract triples from JSON-LD (simplified extraction)
         const triples: Array<[string, string, string]> = claims.map((c: any) => [c.subject, c.predicate, c.object]);
         return { jsonld, triples };
     } catch (error) {
         console.error('LLM RDF generation failed:', error);
-        return mockGenerateRdf(topic, claims, source);
+        throw error;
     }
 }
 
 export async function summarizeDiscrepancy(claimA: any, claimB: any): Promise<{ type: 'missing' | 'contradiction' | 'bias' | 'unsupported' | 'citation_absent'; summary: string; confidence: number }> {
     if (!process.env.OPENAI_API_KEY) {
-        return {
-            type: 'contradiction',
-            summary: 'Heuristic detected difference between claims.',
-            confidence: 0.8,
-        };
+        throw new Error('OPENAI_API_KEY is not set');
     }
 
-    // TODO: Implement LLM based summary
-    return {
-        type: 'contradiction',
-        summary: 'LLM detected difference between claims.',
-        confidence: 0.9,
-    };
-}
+    const prompt = `
+    Compare the following two claims and determine if there is a discrepancy.
+    Claim A: ${JSON.stringify(claimA)}
+    Claim B: ${JSON.stringify(claimB)}
+    
+    Return a JSON object with:
+    - type: one of 'missing', 'contradiction', 'bias', 'unsupported', 'citation_absent'
+    - summary: A brief explanation of the discrepancy.
+    - confidence: A number between 0 and 1.
+    `;
 
-// Fallback Heuristics
-function mockExtractClaims(text: string): any[] {
-    // Simple heuristic: split by periods, assume S-V-O structure roughly
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
-    return sentences.map((s, i) => ({
-        subject: 'Entity',
-        predicate: 'related_to',
-        object: 'Something',
-        rawText: s.trim(),
-        confidence: 0.7
-    }));
-}
+    try {
+        const response = await openai.chat.completions.create({
+            model: 'gpt-3.5-turbo',
+            messages: [
+                { role: 'system', content: "You are a discrepancy detection assistant." },
+                { role: 'user', content: prompt },
+            ],
+            temperature: 0,
+        });
 
-function mockGenerateRdf(topic: string, claims: any[], source: string) {
-    const jsonld = {
-        "@context": "https://schema.org",
-        "@type": "Article",
-        "headline": topic,
-        "author": source,
-        "mentions": claims.map((c, i) => ({
-            "@type": "Statement",
-            "text": c.rawText,
-            "confidence": 0.8
-        }))
-    };
-    const triples: Array<[string, string, string]> = claims.map(c => [c.subject || 'Entity', c.predicate || 'relates', c.object || 'Thing']);
-    return { jsonld, triples };
+        const content = response.choices[0].message.content;
+        if (!content) throw new Error('No content from LLM');
+        return JSON.parse(content);
+    } catch (error) {
+        console.error('Discrepancy summary failed:', error);
+        throw error;
+    }
 }
