@@ -9,7 +9,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Missing job id' }, { status: 400 });
     }
 
-    const job = getJob(id);
+    const job = await getJob(id);
     if (!job) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }

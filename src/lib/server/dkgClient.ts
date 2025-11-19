@@ -1,55 +1,50 @@
-// @ts-ignore
-import DKG from 'dkg.js';
+import axios from "axios";
 
-const dkgOptions = {
-    endpoint: process.env.DKG_ENDPOINT || 'http://localhost:8900',
-    port: 8900,
-    blockchain: {
-        name: 'otp:2043', // Example: OriginTrail Parachain Testnet
-        publicKey: process.env.DKG_WALLET_PUBLIC_KEY,
-        privateKey: process.env.DKG_WALLET_PRIVATE_KEY,
-    },
-    maxNumberOfRetries: 30,
-    frequency: 2,
-    contentType: 'all',
-    nodeApiVersion: '/v1',
-};
+const DKG_API_URL = process.env.DKG_API_URL || "";
+const DKG_PRIVATE_KEY = process.env.DKG_PRIVATE_KEY || "";
 
-let dkg: any;
-try {
-    if (process.env.DKG_WALLET_PRIVATE_KEY) {
-        dkg = new DKG(dkgOptions);
+export function isDkgConfigured() {
+    return !!(DKG_API_URL && DKG_PRIVATE_KEY);
+}
+
+/**
+ * Publish a Knowledge Asset (JSON-LD) to the DKG HTTP API.
+ * This avoids importing dkg.js and its transitive dependencies at build time.
+ */
+export async function publishKnowledgeAsset(asset: any) {
+    if (!DKG_API_URL || !DKG_PRIVATE_KEY) {
+        throw new Error("DKG_API_URL and DKG_PRIVATE_KEY are required to publish Knowledge Assets");
     }
-} catch (e) {
-    console.error('Failed to initialize DKG client', e);
-}
 
-export interface DkgClient {
-    publishKnowledgeAsset(jsonld: any): Promise<{ kaId: string; ual: string }>;
-    getKnowledgeAsset(ual: string): Promise<any>;
-}
-
-export const dkgClient: DkgClient = {
-    async publishKnowledgeAsset(jsonld: any) {
-        if (!dkg) throw new Error('DKG client not initialized');
-        console.log('Publishing asset to DKG...');
-
-        const asset = await dkg.asset.create({
-            public: jsonld,
-        }, {
-            epochsNum: 5
+    try {
+        const resp = await axios.post(`${DKG_API_URL.replace(/\/$/, "")}/knowledge-assets`, asset, {
+            headers: {
+                "Content-Type": "application/json",
+                // using a simple auth header; adapt to your DKG node auth scheme
+                "x-dkg-signature": DKG_PRIVATE_KEY
+            },
+            timeout: 15000
         });
-
-        console.log(`DKG Asset created. UAL: ${asset.UAL}`);
-        return { kaId: asset.UAL, ual: asset.UAL };
-    },
-
-    async getKnowledgeAsset(ual: string) {
-        if (!dkg) throw new Error('DKG client not initialized');
-        console.log(`Fetching asset ${ual} from DKG...`);
-
-        const result = await dkg.asset.get(ual);
-        return result.public;
+        return resp.data;
+    } catch (err: any) {
+        const msg = err?.response?.data || err.message || String(err);
+        throw new Error(`Failed to publish Knowledge Asset: ${msg}`);
     }
-};
+}
+
+export async function fetchKnowledgeAsset(id: string) {
+    if (!DKG_API_URL) {
+        throw new Error("DKG_API_URL is required to fetch Knowledge Assets");
+    }
+    try {
+        const resp = await axios.get(`${DKG_API_URL.replace(/\/$/, "")}/knowledge-assets/${encodeURIComponent(id)}`, {
+            timeout: 10000
+        });
+        return resp.data;
+    } catch (err: any) {
+        const msg = err?.response?.data || err.message || String(err);
+        throw new Error(`Failed to fetch Knowledge Asset ${id}: ${msg}`);
+    }
+}
+
 

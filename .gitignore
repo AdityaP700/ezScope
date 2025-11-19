@@ -1,4 +1,36 @@
-/node_modules
+# Node dependencies
+node_modules/
+
+# Environment variables
 .env
-prisma/migrations
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Next.js build output
+.next/
+out/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / Editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Prisma
+prisma/migrations/
 prisma/migration_lock.toml
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Local database files
+*.db
+*.sqlite

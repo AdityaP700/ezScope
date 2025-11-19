@@ -1,3 +1,7 @@
+import axios from "axios";
+
+const PAYMENT_GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL;
+
 export interface PaymentIntent {
   id: string;
   clientSecret: string;
@@ -5,40 +9,10 @@ export interface PaymentIntent {
   status: 'pending' | 'completed' | 'failed';
 }
 
-export async function createPaymentIntent(amount: number): Promise<PaymentIntent> {
-  // In a real app, this would call Stripe, PayPal, or a crypto payment gateway API
-  const gatewayUrl = process.env.PAYMENT_GATEWAY_URL;
-
-  if (!gatewayUrl) {
-    console.warn('PAYMENT_GATEWAY_URL not set. Simulating payment intent creation.');
-    return {
-      id: 'pi_' + Math.random().toString(36).slice(2),
-      clientSecret: 'secret_' + Math.random().toString(36).slice(2),
-      amount,
-      status: 'pending'
-    };
-  }
-
-  try {
-    // Example fetch call to a hypothetical payment service
-    // const response = await fetch(`${gatewayUrl}/create-intent`, {
-    //     method: 'POST',
-    //     body: JSON.stringify({ amount }),
-    //     headers: { 'Content-Type': 'application/json' }
-    // });
-    // return await response.json();
-
-    console.log(`Creating payment intent via ${gatewayUrl} for ${amount}`);
-    return {
-      id: 'pi_real_' + Date.now(),
-      clientSecret: 'secret_real_' + Date.now(),
-      amount,
-      status: 'pending'
-    };
-  } catch (error) {
-    console.error('Failed to create payment intent:', error);
-    throw error;
-  }
+export async function createPaymentIntent({ amount, currency = "USD", metadata = {} }: { amount: number; currency?: string; metadata?: any }) {
+  if (!PAYMENT_GATEWAY_URL) throw new Error("PAYMENT_GATEWAY_URL required for payments");
+  const resp = await axios.post(`${PAYMENT_GATEWAY_URL}/create-intent`, { amount, currency, metadata }, { headers: { "Content-Type": "application/json" } });
+  return resp.data;
 }
 
 export async function verifyPayment(paymentId: string): Promise<boolean> {

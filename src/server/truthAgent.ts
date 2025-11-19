@@ -1,71 +1,99 @@
-import { extractClaimsFromText } from '../lib/server/claimExtractor';
-import { compareClaims } from '../lib/server/semanticDiff';
-import { dkgClient } from '../lib/server/dkgClient';
-import { createJob, updateJob } from '../lib/server/jobQueue';
-import {
-    createWikipediaAssetJsonLd,
-    createGrokipediaAssetJsonLd,
-    createCommunityNoteAssetJsonLd
-} from '../lib/server/knowledgeAssets';
+import { createJob, updateJob } from '@/lib/server/jobQueue';
+import { extractClaimsFromText } from '@/lib/server/claimExtractor';
+import { convertToRdf } from '@/lib/server/rdfConverter';
+import { compareClaims } from '@/lib/server/semanticDiff';
+import { publishKnowledgeAsset, isDkgConfigured } from '@/lib/server/dkgClient';
 
-export async function runComparisonJob(topic: string, sourceA: string, sourceB: string, textA: string, textB: string) {
-    const jobId = createJob();
+interface ComparisonJobResult {
+    topic: string;
+    sourceA: string;
+    sourceB: string;
+    claimsA: any[];
+    claimsB: any[];
+    discrepancies: any[];
+    assets?: { sourceA?: any; sourceB?: any; notes?: any[] };
+}
 
-    // Run in background
+export async function runComparisonJob(
+    topic: string,
+    sourceA: string,
+    sourceB: string,
+    textA: string | null,
+    textB: string | null
+) {
+    if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY missing; cannot run comparison job');
+
+    // create job record immediately
+    const jobId = await createJob({ status: 'processing', topic, sourceA, sourceB });
+    console.log('[TruthAgent] created job', jobId);
+
+    // start background processing (do not await) so caller receives jobId immediately
     (async () => {
         try {
-            updateJob(jobId, 'processing');
+            console.log('[TruthAgent] Source lengths', {
+                topic,
+                sourceA,
+                sourceB,
+                textALen: textA ? textA.length : 0,
+                textBLen: textB ? textB.length : 0,
+                textASample: textA?.slice(0, 200),
+                textBSample: textB?.slice(0, 200)
+            });
 
-            // 1. Extract Claims
-            const claimsA = await extractClaimsFromText(textA);
-            const claimsB = await extractClaimsFromText(textB);
+            // ensure we have text placeholders
+            const wikiText = textA || '';
+            const grokText = textB || '';
 
-            // 2. Convert to JSON-LD & Publish to DKG (KA1 & KA2)
-            // KA1: Wikipedia
-            const jsonLdA = createWikipediaAssetJsonLd(topic, claimsA, sourceA);
-            const kaA = await dkgClient.publishKnowledgeAsset(jsonLdA);
-            console.log(`Published KA1 (Wikipedia): ${kaA.ual}`);
+            // extract claims (pass jobId so claim IDs are traceable)
+            const claimsA = await extractClaimsFromText(wikiText, topic, jobId);
+            const claimsB = await extractClaimsFromText(grokText, topic, jobId);
 
-            // KA2: Grokipedia
-            const jsonLdB = createGrokipediaAssetJsonLd(topic, claimsB, sourceB);
-            const kaB = await dkgClient.publishKnowledgeAsset(jsonLdB);
-            console.log(`Published KA2 (Grokipedia): ${kaB.ual}`);
+            // convert to RDF/JSON-LD (if used)
+            const rdfA = await convertToRdf(topic, claimsA, sourceA);
+            const rdfB = await convertToRdf(topic, claimsB, sourceB);
 
-            // 3. Semantic Diff
+            // semantic diff / comparison
             const comparison = await compareClaims(topic, claimsA, claimsB);
 
-            // 4. Generate Community Notes (KA3) & Publish to DKG
-            const notes = [];
-            for (const diff of comparison.discrepancies) {
-                const noteJsonLd = createCommunityNoteAssetJsonLd(
-                    topic,
-                    diff.type,
-                    diff.summary,
-                    [kaA.ual, kaB.ual],
-                    diff.confidence,
-                    '0' // Initial staked value
-                );
-
-                const kaNote = await dkgClient.publishKnowledgeAsset(noteJsonLd);
-                console.log(`Published KA3 (Community Note): ${kaNote.ual}`);
-
-                notes.push({
-                    ...diff,
-                    ual: kaNote.ual,
-                    kaId: kaNote.kaId,
-                    evidence: [kaA.ual, kaB.ual],
-                    stakedValue: '0'
-                });
+            // publish assets if configured
+            const assets: any = {};
+            if (isDkgConfigured()) {
+                try {
+                    assets.sourceA = await publishKnowledgeAsset(rdfA);
+                } catch (pubErr) {
+                    console.warn('[TruthAgent] publish sourceA failed', (pubErr as any)?.message);
+                }
+                if (rdfB) {
+                    try {
+                        assets.sourceB = await publishKnowledgeAsset(rdfB);
+                    } catch (pubErr) {
+                        console.warn('[TruthAgent] publish sourceB failed', (pubErr as any)?.message);
+                    }
+                }
             }
 
-            updateJob(jobId, 'completed', { comparison, notes, kaA, kaB });
+            // update job as completed with result
+            await updateJob(jobId, {
+                status: 'completed',
+                result: {
+                    topic,
+                    sourceA,
+                    sourceB,
+                    claimsA,
+                    claimsB,
+                    discrepancies: comparison.discrepancies ?? comparison,
+                    assets
+                }
+            });
 
-        } catch (error: any) {
-            console.error('Job failed:', error);
-            updateJob(jobId, 'failed', undefined, error.message);
+            console.log('[TruthAgent] job completed', jobId);
+        } catch (e: any) {
+            console.error('[TruthAgent] job error', jobId, e);
+            await updateJob(jobId, { status: 'error', error: (e && e.message) ? e.message : String(e) });
         }
     })();
 
+    // return jobId immediately so caller can poll /api/job
     return jobId;
 }
 

@@ -20,6 +20,8 @@ export async function POST(request: Request) {
         const textA = providedTextA || await fetchWikipediaContent(topic);
         const textB = providedTextB || await fetchGrokipediaContent(topic);
 
+        console.log('compare route — topic:', topic, 'wikiLen:', textA ? textA.length : 0, 'grokLen:', textB ? textB.length : 0);
+
         const jobId = await runComparisonJob(topic, sourceA, sourceB, textA, textB);
 
         return NextResponse.json({ jobId });
