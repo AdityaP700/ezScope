@@ -160,10 +160,41 @@ export async function fetchWikipediaByQuery(query: string, lang = "en") {
 }
 
 // 6. Placeholder Grokipedia content (replace when real source available)
+// --- Inside contentFetcher.ts ---
+
 export async function fetchGrokipediaContent(topic: string): Promise<string> {
-  // No real Grokipedia backend yet — return empty string so the extractor
-  // can legitimately return an empty claim list instead of hallucinating.
-  return '';
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey || apiKey === 'mock') {
+      console.warn("No OpenAI Key for Grok content generation. Returning empty.");
+      return "";
+  }
+
+  console.log(`[TruthAgent] Generating 'Grokipedia' content for: ${topic}`);
+
+  try {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-3.5-turbo', // or gpt-4 if available
+        messages: [
+          {
+            role: 'system',
+            content: 'You are "Grokipedia", an AI encyclopedia. Write a detailed, factual article about the user request. Focus on technical mechanisms and facts.'
+          },
+          { role: 'user', content: topic }
+        ],
+        temperature: 0.7,
+      },
+      { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } }
+    );
+
+    const text = response.data?.choices?.[0]?.message?.content;
+    return text || "";
+  } catch (error: any) {
+    console.error("Failed to generate Grok content:", error?.message);
+    return "";
+  }
 }
 
 /**
