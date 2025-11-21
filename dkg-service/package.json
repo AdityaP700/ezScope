@@ -1,0 +1,9 @@
+{
+  "name": "dkg-service",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "dkg.js": "^8.2.0",
+    "express": "^4.21.2"
+  }
+}

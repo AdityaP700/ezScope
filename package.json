@@ -15,7 +15,9 @@
     "dependencies": {
         "axios": "^1.13.2",
         "clsx": "^2.0.0",
-        "ethers": "^5.8.0",
+        "dkg.js": "^8.2.0",
+        "ethers": "5.7.2",
+        "ethers5": "npm:ethers@5.7.2",
         "ioredis": "^5.8.2",
         "lucide-react": "^0.290.0",
         "next": "14.0.4",
@@ -23,6 +25,7 @@
         "react": "18.2.0",
         "react-dom": "18.2.0",
         "tailwind-merge": "^2.0.0",
+        "web-streams-polyfill": "^3.2.1",
         "zod": "^3.0.0"
     },
     "devDependencies": {

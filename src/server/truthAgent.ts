@@ -3,6 +3,7 @@ import { extractClaimsFromText } from '@/lib/server/claimExtractor';
 import { convertToRdf } from '@/lib/server/rdfConverter';
 import { compareClaims } from '@/lib/server/semanticDiff';
 import { publishKnowledgeAsset, isDkgConfigured } from '@/lib/server/dkgClient';
+import { generateKnowledgeAssets } from '@/lib/server/assetGenerator';
 
 interface ComparisonJobResult {
     topic: string;
@@ -55,20 +56,26 @@ export async function runComparisonJob(
             // semantic diff / comparison
             const comparison = await compareClaims(topic, claimsA, claimsB);
 
-            // publish assets if configured
-            const assets: any = {};
+            // Generate JSON-LD Knowledge Assets from claims + discrepancies
+            const assets = generateKnowledgeAssets(topic, claimsA, claimsB, comparison.discrepancies || [],jobId);
+
+            // Optionally publish to DKG if configured. Store publish responses separately
+            const published: any = {};
             if (isDkgConfigured()) {
                 try {
-                    assets.sourceA = await publishKnowledgeAsset(rdfA);
+                    published.wikipedia = await publishKnowledgeAsset(assets.wikipediaKA);
                 } catch (pubErr) {
-                    console.warn('[TruthAgent] publish sourceA failed', (pubErr as any)?.message);
+                    console.warn('[TruthAgent] publish wikipediaKA failed', (pubErr as any)?.message);
                 }
-                if (rdfB) {
-                    try {
-                        assets.sourceB = await publishKnowledgeAsset(rdfB);
-                    } catch (pubErr) {
-                        console.warn('[TruthAgent] publish sourceB failed', (pubErr as any)?.message);
-                    }
+                try {
+                    published.grokipedia = await publishKnowledgeAsset(assets.grokipediaKA);
+                } catch (pubErr) {
+                    console.warn('[TruthAgent] publish grokipediaKA failed', (pubErr as any)?.message);
+                }
+                try {
+                    published.communityNote = await publishKnowledgeAsset(assets.communityNoteKA);
+                } catch (pubErr) {
+                    console.warn('[TruthAgent] publish communityNoteKA failed', (pubErr as any)?.message);
                 }
             }
 
@@ -82,7 +89,8 @@ export async function runComparisonJob(
                     claimsA,
                     claimsB,
                     discrepancies: comparison.discrepancies ?? comparison,
-                    assets
+                    assets: assets,
+                    published: published
                 }
             });
 

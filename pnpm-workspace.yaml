@@ -1,0 +1,2 @@
+patchedDependencies:
+  assertion-tools: patches/assertion-tools.patch

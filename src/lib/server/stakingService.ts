@@ -1,5 +1,5 @@
-import { ethers } from 'ethers';
-import { dkgClient } from './dkgClient';
+import { ethers } from "ethers";
+import { publishKnowledgeAsset } from './dkgClient';
 import { createTrustMetadataAssetJsonLd } from './knowledgeAssets';
 
 const RPC_URL = process.env.RPC_URL || 'https://rpc.neuroweb.ai'; // Example NeuroWeb RPC
@@ -36,20 +36,23 @@ export async function stakeOnNote(noteId: string, amount: string) {
     }
 
     // Publish KA4: Trust Layer Metadata to DKG
-    try {
-        console.log('Publishing KA4 (Trust Event) to DKG...');
-        const trustJsonLd = createTrustMetadataAssetJsonLd(
-            noteId,
-            PRIVATE_KEY ? new ethers.Wallet(PRIVATE_KEY).address : '0xMockValidator',
-            'stake',
-            amount
-        );
-        const ka4 = await dkgClient.publishKnowledgeAsset(trustJsonLd);
-        console.log(`Published KA4: ${ka4.ual}`);
-    } catch (dkgError) {
-        console.error('Failed to publish KA4 trust event:', dkgError);
-        // We don't fail the whole operation if DKG publish fails, as the stake is already on-chain
-    }
+        try {
+            console.log('Publishing KA4 (Trust Event) to DKG...');
+            const trustJsonLd = createTrustMetadataAssetJsonLd(
+                noteId,
+                PRIVATE_KEY ? new ethers.Wallet(PRIVATE_KEY).address : '0xMockValidator',
+                'stake',
+                amount
+            );
+            const ka4 = await publishKnowledgeAsset(trustJsonLd);
+            // handle different casing returned by various clients
+            const anyKa4: any = ka4;
+            const ual = anyKa4?.UAL || anyKa4?.ual || anyKa4?.ualString || null;
+            console.log(`Published KA4: ${ual ?? JSON.stringify(anyKa4)}`);
+        } catch (dkgError) {
+            console.error('Failed to publish KA4 trust event:', dkgError);
+            // We don't fail the whole operation if DKG publish fails, as the stake is already on-chain
+        }
 
     return { success: true, txHash };
 }

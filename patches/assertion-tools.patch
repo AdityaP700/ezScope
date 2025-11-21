@@ -1,0 +1,11 @@
+diff --git a/src/knowledge-asset-tools.js b/src/knowledge-asset-tools.js
+index 517bbb2cedd881aca160d82124fc14e90aa8b905..09c8d7036a431eec670f48b36345561c1e2fc2d9 100644
+--- a/src/knowledge-asset-tools.js
++++ b/src/knowledge-asset-tools.js
+@@ -1,5 +1,5 @@
+ import jsonld from "jsonld";
+-import ethers from "ethers";
++import { ethers } from "ethers";
+ import { v4 as uuidv4 } from "uuid";
+ import { MerkleTree } from "merkletreejs";
+ import {
