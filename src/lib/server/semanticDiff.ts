@@ -69,7 +69,7 @@ export async function compareClaims(topic: string, claimsA: Claim[], claimsB: Cl
             // Strong match, assume agreement.
             matchedB.add(cB.id!);
         }
-        else if (cB && bestScore > 0.75) {
+        else if (cB && bestScore > 0.78) {
             // Semantic match, but wording is different. Potential nuance or contradiction.
             matchedB.add(cB.id!);
 
